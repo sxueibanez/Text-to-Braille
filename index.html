@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text to Braille Art Generator</title>
+    <title>Braille Art Studio - Text & Image</title>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 20px auto;
             padding: 0 20px;
             background-color: #f5f5f5;
@@ -19,12 +19,57 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+        
+        /* 选项卡样式 */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 6px;
+            background: #f0f0f0;
+            font-weight: bold;
+            transition: all 0.2s;
+            border: none;
+            color: #555;
+            font-size: 16px;
+        }
+        .tab:hover { background: #e4e4e4; }
+        .tab.active {
+            background: #007bff;
+            color: white;
+        }
+
+        /* 控制面板样式 */
+        .panel {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        .panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
         .controls {
             display: flex;
+            flex-wrap: wrap;
             gap: 15px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 4px;
             align-items: center;
         }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
         textarea {
             width: 100%;
             height: 100px;
@@ -34,55 +79,120 @@
             border-radius: 4px;
             resize: vertical;
             font-size: 16px;
+            margin-bottom: 15px;
         }
+
+        /* 输出区样式 */
         .output-container {
             margin-top: 20px;
             position: relative;
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            background: #fafafa;
+            transition: all 0.2s;
+        }
+        .output-container.dragover {
+            border-color: #007bff;
+            background: #e9f2ff;
         }
         pre {
             background: #1e1e1e;
-            color: #d4d4d4;
+            color: #f0f0f0; 
             padding: 15px;
+            margin: 0;
             border-radius: 4px;
             overflow-x: auto;
-            /* 使用等宽字体确保盲文对齐 */
             font-family: monospace; 
-            line-height: 1; /* 紧凑行高 */
+            line-height: 1; 
             font-size: 14px;
             white-space: pre;
+            max-height: 60vh;
+            overflow-y: auto;
+            min-height: 150px;
         }
-        button {
+        button.action-btn {
             background: #007bff;
             color: white;
             border: none;
             padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
+            font-weight: bold;
         }
-        button:hover { background: #0056b3; }
-        input[type="range"] { vertical-align: middle; }
+        button.action-btn:hover { background: #0056b3; }
+        label { font-weight: bold; cursor: pointer; }
+        input[type="range"] { vertical-align: middle; width: 120px; }
+        input[type="checkbox"] { width: 18px; height: 18px; vertical-align: middle; }
+        
+        .hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            pointer-events: none;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>文字转盲文点阵工具</h2>
+    <h2>全能盲文点阵生成器</h2>
     
-    <div class="controls">
-        <label>
-            分辨率 (字体大小): <span id="sizeValue">32</span>px
-            <input type="range" id="fontSize" min="16" max="100" value="32">
-        </label>
-        <button onclick="copyResult()">复制结果</button>
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('text')">📝 文字模式</button>
+        <button class="tab" onclick="switchTab('image')">🖼️ 图片模式</button>
     </div>
 
-    <textarea id="inputText" placeholder="在这里输入文字 (支持中英文)...
-例如：
-SELECT
-FILE">SELECT
-FILE</textarea>
+    <div id="textPanel" class="panel active">
+        <textarea id="inputText" placeholder="在这里输入文字 (支持中英文)...&#10;例如：&#10;SELECT&#10;FILE"></textarea>
+        <div class="controls">
+            <div class="control-group">
+                <label>分辨率 (字体大小): <span id="sizeValue">32</span>px</label>
+                <input type="range" id="fontSize" min="16" max="100" value="32">
+            </div>
+            <div class="control-group" style="margin-left: auto;">
+                <label><input type="checkbox" id="autoCropText" checked> 自动裁剪空白</label>
+            </div>
+        </div>
+    </div>
 
-    <div class="output-container">
+    <div id="imagePanel" class="panel">
+        <div class="controls">
+            <div class="control-group" style="width: 100%; margin-bottom: 10px;">
+                <label>选择图片:</label>
+                <input type="file" id="imageLoader" accept="image/*">
+                <span style="color: #666; font-size: 14px;">(支持直接 Ctrl+V 粘贴，或拖拽图片)</span>
+            </div>
+            
+            <div class="control-group">
+                <label>输出宽度: <span id="widthValue">80</span></label>
+                <input type="range" id="scaleSlider" min="30" max="250" value="80">
+            </div>
+
+            <div class="control-group">
+                <label>阈值(浓度): <span id="thresholdValue">128</span></label>
+                <input type="range" id="thresholdSlider" min="0" max="255" value="128">
+            </div>
+
+            <div class="control-group">
+                <label><input type="checkbox" id="invertColors"> 反色提取</label>
+            </div>
+
+            <div class="control-group" style="margin-left: auto;">
+                <label><input type="checkbox" id="autoCropImg" checked> 自动裁剪空白</label>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+        <h3 style="margin: 0;">预览结果</h3>
+        <button class="action-btn" onclick="copyResult()">📋 复制结果</button>
+    </div>
+
+    <div class="output-container" id="dropZone">
+        <div class="hint" id="mainHint">输入文字，或在此处粘贴 (Ctrl+V) / 拖拽图片</div>
         <pre id="output"></pre>
     </div>
 </div>
@@ -91,9 +201,23 @@ FILE</textarea>
     const inputText = document.getElementById('inputText');
     const fontSizeSlider = document.getElementById('fontSize');
     const sizeValue = document.getElementById('sizeValue');
+    const autoCropText = document.getElementById('autoCropText');
+    
+    const imageLoader = document.getElementById('imageLoader');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const widthValue = document.getElementById('widthValue');
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const thresholdValue = document.getElementById('thresholdValue');
+    const invertColors = document.getElementById('invertColors');
+    const autoCropImg = document.getElementById('autoCropImg');
+    
     const output = document.getElementById('output');
+    const mainHint = document.getElementById('mainHint');
+    const dropZone = document.getElementById('dropZone');
 
-    // 盲文点阵对应的二进制增量矩阵 (2列 x 4行)
+    let currentMode = 'text'; // 'text' 或 'image'
+    let originalImage = null; 
+
     const BRAILLE_MATRIX = [
         [1, 8],
         [2, 16],
@@ -101,36 +225,68 @@ FILE</textarea>
         [64, 128]
     ];
 
-    function generateBraille() {
+    function renderBraille(rows, shouldCrop) {
+        let brailleResult = '';
+        if (shouldCrop) {
+            let minX = Infinity;
+            let minY = -1;
+            let maxY = -1;
+
+            // 寻找有效边界
+            for (let y = 0; y < rows.length; y++) {
+                let row = rows[y];
+                for (let x = 0; x < row.length; x++) {
+                    if (row[x] !== '⠀') {
+                        if (minY === -1) minY = y;
+                        maxY = y;
+                        if (x < minX) minX = x;
+                    }
+                }
+            }
+
+            if (minY !== -1) {
+                let croppedRows = [];
+                for (let y = minY; y <= maxY; y++) {
+                    let trimmed = rows[y].substring(minX).replace(/⠀+$/, '');
+                    croppedRows.push(trimmed);
+                }
+                brailleResult = croppedRows.join('\n');
+            } else {
+                brailleResult = ""; // 空
+            }
+        } else {
+            brailleResult = rows.map(r => r.replace(/⠀+$/, '')).join('\n');
+        }
+
+        output.textContent = brailleResult;
+        mainHint.style.display = brailleResult.length > 0 ? 'none' : 'block';
+    }
+
+    function generateFromText() {
+        if (currentMode !== 'text') return;
         const text = inputText.value;
         const fontSize = parseInt(fontSizeSlider.value);
         if (!text) {
-            output.textContent = '';
+            renderBraille([], false);
             return;
         }
 
-        // 1. 创建并设置 Canvas
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        
         const lines = text.split('\n');
         ctx.font = `bold ${fontSize}px sans-serif`;
         
-        // 测量画布需要的宽高
         let maxWidth = 0;
         lines.forEach(line => {
             const metrics = ctx.measureText(line);
             if (metrics.width > maxWidth) maxWidth = metrics.width;
         });
 
-        // 为了防止文字被截断，稍微增加一点边距，并确保宽高是 2 和 4 的倍数
         canvas.width = Math.ceil((maxWidth + 10) / 2) * 2;
         canvas.height = Math.ceil((lines.length * fontSize * 1.2) / 4) * 4;
 
-        // 2. 重新设置字体并绘制文字
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
         ctx.fillStyle = 'black';
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textBaseline = 'top';
@@ -139,58 +295,176 @@ FILE</textarea>
             ctx.fillText(line, 0, index * fontSize * 1.2);
         });
 
-        // 3. 读取像素并转换为盲文
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-        let brailleResult = '';
+        let rows = [];
 
-        // 每次步进 4 行 (高度), 2 列 (宽度)
         for (let y = 0; y < canvas.height; y += 4) {
             let rowString = '';
             for (let x = 0; x < canvas.width; x += 2) {
                 let brailleCharValue = 0;
-
-                // 检查 2x4 区块内的 8 个像素
                 for (let dy = 0; dy < 4; dy++) {
                     for (let dx = 0; dx < 2; dx++) {
                         const px = x + dx;
                         const py = y + dy;
-                        
                         if (px < canvas.width && py < canvas.height) {
                             const index = (py * canvas.width + px) * 4;
-                            const r = imgData[index];
-                            // 因为背景是白，文字是黑，红色通道小于 128 我们就认为是文字像素
-                            if (r < 128) {
+                            if (imgData[index] < 128) {
                                 brailleCharValue += BRAILLE_MATRIX[dy][dx];
                             }
                         }
                     }
                 }
-                
-                // 将计算出的值加上盲文基准 Unicode 0x2800
                 rowString += String.fromCharCode(0x2800 + brailleCharValue);
             }
-            // 去除行尾的空白盲文字符 (⠀) 以减小输出体积
-            brailleResult += rowString.replace(/⠀+$/, '') + '\n';
+            rows.push(rowString);
         }
 
-        output.textContent = brailleResult.replace(/\n+$/, ''); // 去除末尾多余空行
+        renderBraille(rows, autoCropText.checked);
     }
 
+    function generateFromImage() {
+        if (currentMode !== 'image' || !originalImage) return;
+
+        const targetCharWidth = parseInt(scaleSlider.value); 
+        const brightnessThreshold = parseInt(thresholdSlider.value); 
+        const isInverted = invertColors.checked;
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        canvas.width = targetCharWidth * 2;
+        const aspectRatio = originalImage.height / originalImage.width;
+        canvas.height = Math.ceil((canvas.width * aspectRatio) / 4) * 4;
+
+        ctx.fillStyle = 'white'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let rows = [];
+
+        for (let y = 0; y < canvas.height; y += 4) {
+            let rowString = '';
+            for (let x = 0; x < canvas.width; x += 2) {
+                let brailleCharValue = 0;
+                for (let dy = 0; dy < 4; dy++) {
+                    for (let dx = 0; dx < 2; dx++) {
+                        const px = x + dx;
+                        const py = y + dy;
+                        if (px < canvas.width && py < canvas.height) {
+                            const idx = (py * canvas.width + px) * 4;
+                            const brightness = 0.299 * imgData[idx] + 0.587 * imgData[idx+1] + 0.114 * imgData[idx+2];
+                            
+                            let isDot = brightness < brightnessThreshold;
+                            if (isInverted) isDot = !isDot;
+
+                            if (isDot) brailleCharValue += BRAILLE_MATRIX[dy][dx];
+                        }
+                    }
+                }
+                rowString += String.fromCharCode(0x2800 + brailleCharValue);
+            }
+            rows.push(rowString);
+        }
+
+        renderBraille(rows, autoCropImg.checked);
+    }
+
+
+    // 选项卡切换逻辑
+    function switchTab(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        
+        if (mode === 'text') {
+            document.querySelector('.tab:nth-child(1)').classList.add('active');
+            document.getElementById('textPanel').classList.add('active');
+            generateFromText(); 
+        } else {
+            document.querySelector('.tab:nth-child(2)').classList.add('active');
+            document.getElementById('imagePanel').classList.add('active');
+            if (originalImage) {
+                generateFromImage(); 
+            } else {
+                output.textContent = '';
+                mainHint.style.display = 'block';
+                mainHint.textContent = '请选择图片，或在此处粘贴 (Ctrl+V) / 拖拽图片';
+            }
+        }
+    }
+
+    function loadImageFromFile(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        
+        // 自动切换到图片模式
+        if (currentMode !== 'image') switchTab('image');
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            originalImage = new Image();
+            originalImage.onload = function() {
+                generateFromImage();
+            };
+            originalImage.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 事件：文字输入与滑块
+    inputText.addEventListener('input', generateFromText);
+    fontSizeSlider.addEventListener('input', (e) => {
+        sizeValue.textContent = e.target.value;
+        generateFromText();
+    });
+    autoCropText.addEventListener('change', generateFromText);
+
+    [scaleSlider, thresholdSlider, invertColors, autoCropImg].forEach(el => {
+        el.addEventListener('input', () => {
+            if (el === scaleSlider) widthValue.textContent = scaleSlider.value;
+            if (el === thresholdSlider) thresholdValue.textContent = thresholdSlider.value;
+            generateFromImage();
+        });
+    });
+
+    imageLoader.addEventListener('change', e => loadImageFromFile(e.target.files[0]));
+    document.addEventListener('paste', e => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf("image") !== -1) {
+                loadImageFromFile(items[i].getAsFile());
+                break;
+            }
+        }
+    });
+
+    // 事件：拖拽图片
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            loadImageFromFile(e.dataTransfer.files[0]);
+        }
+    });
+
     function copyResult() {
+        if (!output.textContent) return;
         navigator.clipboard.writeText(output.textContent).then(() => {
             alert('复制成功！');
         });
     }
 
-    // 绑定事件监听，实现实时转换
-    inputText.addEventListener('input', generateBraille);
-    fontSizeSlider.addEventListener('input', (e) => {
-        sizeValue.textContent = e.target.value;
-        generateBraille();
-    });
+    // 页面初始化时触发一次
+    generateFromText();
 
-    // 初始化运行一次
-    generateBraille();
 </script>
 </body>
 </html>
